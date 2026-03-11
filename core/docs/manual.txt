@@ -93,6 +93,9 @@ hexadecimal number either prepended with "$" or "0x", or followed by the charact
 "h". Because the first digit of a hexadecimal number can be a letter, it may be
 needed to prepend it with the digit zero in order to make it recognizable as a number.
 For example, "0Ah" is a valid number, while "Ah" is just a name.
+  Beside the digits, the numbers are also allowed to contain underscores or single
+quotes to act as a separator or padding, to aid in making longer numbers more
+readable.
 
 
 2. Symbol identifiers
