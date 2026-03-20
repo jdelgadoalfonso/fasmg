@@ -2158,7 +2158,9 @@ by one or more names separated with commas.
                 assemble cmd
         end calminstruction
 
-A symbol made local is initally assigned a defined but unusable value.
+To ensure that the symbol is seen as local, it is initially assigned a defined but
+unusable value. This is done when "local" statement is encountered during the definition
+of the instruction and it does not put any command into the code of the compiled macro. 
   If a pattern in CALM instruction has a "?" character immediately following the name
 of a wildcard, it does not affect how the symbol is identified (whether the used symbol
 is case-insensitive depends on what is present in the local scope at the time
