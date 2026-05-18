@@ -2444,6 +2444,75 @@ macro call target
     end if
 end macro
 
+macro bswap64 dst
+    BPF_ALU64_IMM BPF_END, (dst - bpf_reg), 64
+end macro
+
+macro bswap32 dst
+    BPF_ALU64_IMM BPF_END, (dst - bpf_reg), 32
+end macro
+
+macro bswap16 dst
+    BPF_ALU64_IMM BPF_END, (dst - bpf_reg), 16
+end macro
+
+macro nop
+    BPF_INSN BPF_ALU64 or BPF_MOV or BPF_X, r0, r0, 0, 0
+end macro
+
+macro xor_zero dst
+    ; xor r0, r0 es igual a ponerlo a cero
+    BPF_ALU64_REG BPF_XOR, (dst - bpf_reg), (dst - bpf_reg)
+end macro
+
+macro neg dst
+    BPF_ALU64_REG BPF_NEG, (dst - bpf_reg), 0
+end macro
+
+macro map_lookup map_fd, key_reg, value_reg
+    ld_map_fd r1, map_fd
+    mov       r2, key_reg
+    call      BPF_FUNC_map_lookup_elem
+    mov       value_reg, r0
+end macro
+
+; Acceso directo al contexto XDP (r1 es ctx)
+; ctx->data es offset 0, ctx->data_end es offset 8
+macro get_data dst, src
+    ldx_mem dw, dst, src, 0
+end macro
+
+macro get_data_end dst, src
+    ldx_mem dw, dst, src, 8
+end macro
+
+macro tail_call map_fd, index
+    ld_map_fd r2, map_fd
+    mov       r3, index
+    call      BPF_FUNC_tail_call
+end macro
+
+macro clear_reg dst, size
+    match =b, size
+        and dst, 0xFF
+    end match
+    match =8, size
+        and dst, 0xFF
+    end match
+    match =h, size
+        and dst, 0xFFFF
+    end match
+    match =16, size
+        and dst, 0xFFFF
+    end match
+    match =w, size
+        and dst, 0xFFFFFFFF
+    end match
+    match =32, size
+        and dst, 0xFFFFFFFF
+    end match
+end macro
+
 macro ret
     BPF_EXIT_INSN
 end macro

@@ -7,7 +7,9 @@
 ; =============================================================================
 
 include '../x86/include/format/elf64.inc'
+include '../utility/struct.inc'
 include 'ebpf_jit.inc'
+include 'ip_header.inc'
 
 ; =============================================================================
 ; EJEMPLO 1 — xdp_pass
@@ -64,7 +66,7 @@ tc_count_prog:
     ; *(u64*)(r7 + 0) += 1  (atomico)
     mov r1, 1
     ;atomic_op  BPF_DW, BPF_XADD, r7, r1, 0
-    stx_mem     BPF_DW, r7, r1, 0
+    stx_mem     w, r7, r1, 0
 
   .ret_ok:
     mov r0, TC_ACT_OK
@@ -104,6 +106,91 @@ sockfilter_prog:
 
 sockfilter_prog_end:
 
+macro ld_hdr_swap sz, dst, src, off
+    ldx_mem sz, dst, src, off
+    if sz = b
+        ; nada que hacer
+    else if sz = h
+        bswap16 dst
+    else if sz = w
+        bswap32 dst
+    else if sz = dw
+        bswap64 dst
+    end if
+end macro
+
+; Definición de estructura de mapa según el kernel
+struct bpf_map_def
+    type         dd ?
+    key_size     dd ?
+    value_size   dd ?
+    max_entries  dd ?
+    flags        dd ?
+ends
+
+section '.maps' writeable
+    ; Este es el mapa que tu código eBPF buscará
+    pkt_count_map bpf_map_def type:BPF_MAP_TYPE_HASH, key_size:4, value_size:8, max_entries:1024, flags:0
+
+section '.rtt' writeable
+
+public rtt_prog
+public rtt_prog_end
+
+; Ejemplo de lógica para guardar el timestamp al salir un paquete
+; Asumimos:
+; r1 = ctx (contexto)
+; r6 = mapa_latencia_fd
+; r7 = numero_secuencia_paquete (extraído previamente)
+
+rtt_prog:
+    ; r1 = contexto skb
+    ; r6 = mapa_latencia_fd
+    ld_map_fd r6, 0
+
+    ; --- LEER IP_ID (Offset 18 desde el inicio de Ethernet) ---
+    ; IP_ID es de 16 bits (h)
+    clear_reg r7, h
+
+    ld_hdr_swap h, r7, r1, 18
+
+    ld_ip_field r2, r1, IP_DST
+    mov         r3, 0x04030201
+    cmp         r2, r3
+    jne         .pass
+
+    ; 2. Filtrar Puerto Destino 80
+    ld_tcp_field r2, r1, TCP_DST_PORT
+    mov          r3, 80
+    cmp          r2, r3
+    jne          .pass
+
+    ; 3. SI LLEGA AQUI: Es tráfico HTTP hacia nuestra IP, medir RTT
+    ; (Aquí iría tu lógica de bpf_map_update_elem usando el SEQ_NUM como llave)
+    ld_hdr_swap w, r7, r1, (34 + TCP_SEQ_NUM) ; Leemos SEQ_NUM
+
+    ; --- GUARDAR TIMESTAMP EN MAPA ---
+    ; r7 ahora tiene el IP_ID (nuestra clave)
+    stx_mem w, r10, r7, -4      ; clave (IP_ID) en r10-4
+
+    call BPF_FUNC_ktime_get_ns
+    stx_mem BPF_DW, r10, r0, -16    ; valor (timestamp) en r10-16
+
+    ; Preparar argumentos para bpf_map_update_elem
+    mov r1, r6                  ; mapa
+    mov r2, r10
+    add r2, -4                  ; &key
+    mov r3, r10
+    add r3, -16                 ; &val
+    mov r4, 0                   ; flags BPF_ANY
+    call BPF_FUNC_map_update_elem
+
+    ; Salir
+.pass:
+    mov r0, TC_ACT_OK
+    ret
+
+rtt_prog_end:
 
 ; =============================================================================
 ; EJEMPLO 4 — jit_thunk  (codigo nativo x86-64)
