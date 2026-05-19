@@ -320,6 +320,8 @@ macro section?
 				store SECTION_NAME_POSITION + 5 at section_table : Elf64_Shdr.sh_name + SECTION_INDEX * sizeof Elf64_Shdr
 				store SECTION_NAME_POSITION + 5 at symbol_table : Elf64_Sym.st_name + SECTION_SYMBOL_INDEX * sizeof Elf64_Sym
 				if MACHINE = EM_BPF
+					store 9 at section_table : Elf64_Shdr.sh_type + (SECTION_INDEX+1) * sizeof Elf64_Shdr
+					store 16 at section_table : Elf64_Shdr.sh_entsize + (SECTION_INDEX+1) * sizeof Elf64_Shdr
 					store '.rel.' + SECTION_NAME shl (5*8) : 5 + lengthof (string SECTION_NAME) at string_table:SECTION_NAME_POSITION
 				else
 					store '.rela' + SECTION_NAME shl (5*8) : 5 + lengthof (string SECTION_NAME) at string_table:SECTION_NAME_POSITION
@@ -534,6 +536,9 @@ calminstruction dword? value
 	compute info, ELF.R_32 + (0 scaleof (1 metadataof value)) shl 32
 	jump	add_relocation
     bpf_r32:
+	compute offset, offset - ELF.SECTION_OFFSET
+	compute offset, offset and not 7
+	compute addend, 0
 	; Extraemos el índice del símbolo (scale 1) en lugar del de la sección
 	compute info, ELF.R_32 + (1 scaleof (1 metadataof value)) shl 32
 	jump	add_relocation
@@ -606,6 +611,9 @@ calminstruction qword? value
 	compute info, ELF.R_64 + (0 scaleof (1 metadataof value)) shl 32
 	jump	add_relocation
     bpf_r64:
+	compute offset, offset - ELF.SECTION_OFFSET
+	compute offset, offset and not 7
+	compute addend, 0
 	compute info, ELF.R_64 + (1 scaleof (1 metadataof value)) shl 32
     add_relocation:
 	local	Rela
