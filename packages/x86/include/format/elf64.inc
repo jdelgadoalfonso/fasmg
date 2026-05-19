@@ -208,6 +208,11 @@ namespace ELF
 		R_PLT32 = 0
 		R_GOT32 = 0
 		R_GOTPCREL = 0
+		RELOC_SIZE = 16
+		RELOC_TYPE = SHT_REL
+	else
+		RELOC_SIZE = 24
+		RELOC_TYPE = SHT_RELA
 	end if
 
 	Header:
@@ -303,12 +308,12 @@ macro section?
 
 			if RELOCATION_INDEX > SECTION_RELOCATION_INDEX
 
-				store RELOCATIONS_OFFSET + SECTION_RELOCATION_INDEX * sizeof Elf64_Rela at section_table : Elf64_Shdr.sh_offset + (SECTION_INDEX+1) * sizeof Elf64_Shdr
-				store (RELOCATION_INDEX - SECTION_RELOCATION_INDEX) * sizeof Elf64_Rela at section_table : Elf64_Shdr.sh_size + (SECTION_INDEX+1) * sizeof Elf64_Shdr
-				store SHT_RELA at section_table : Elf64_Shdr.sh_type + (SECTION_INDEX+1) * sizeof Elf64_Shdr
+				store RELOCATIONS_OFFSET + SECTION_RELOCATION_INDEX * RELOC_SIZE at section_table : Elf64_Shdr.sh_offset + (SECTION_INDEX+1) * sizeof Elf64_Shdr
+				store (RELOCATION_INDEX - SECTION_RELOCATION_INDEX) * RELOC_SIZE at section_table : Elf64_Shdr.sh_size + (SECTION_INDEX+1) * sizeof Elf64_Shdr
+				store RELOC_TYPE at section_table : Elf64_Shdr.sh_type + (SECTION_INDEX+1) * sizeof Elf64_Shdr
 				store SYMBOL_TABLE_SECTION_INDEX at section_table : Elf64_Shdr.sh_link + (SECTION_INDEX+1) * sizeof Elf64_Shdr
 				store SECTION_INDEX at section_table : Elf64_Shdr.sh_info + (SECTION_INDEX+1) * sizeof Elf64_Shdr
-				store sizeof Elf64_Rela at section_table : Elf64_Shdr.sh_entsize + (SECTION_INDEX+1) * sizeof Elf64_Shdr
+				store RELOC_SIZE at section_table : Elf64_Shdr.sh_entsize + (SECTION_INDEX+1) * sizeof Elf64_Shdr
 				store 8 at section_table : Elf64_Shdr.sh_addralign + (SECTION_INDEX+1) * sizeof Elf64_Shdr
 
 				store SECTION_NAME_POSITION at section_table : Elf64_Shdr.sh_name + (SECTION_INDEX+1) * sizeof Elf64_Shdr
@@ -572,7 +577,10 @@ calminstruction dword? value
 	local	Rela
 	compute Rela, ELF.RELOCATION_INDEX * sizeof Elf64_Rela
 	asm	store offset at ELF.relocations : Rela + Elf64_Rela.r_offset
+	check ELF.MACHINE = EM_BPF
+	jyes skip_addend
 	asm	store addend at ELF.relocations : Rela + Elf64_Rela.r_addend
+    skip_addend:
 	asm	store info at ELF.relocations : Rela + Elf64_Rela.r_info
 	compute ELF.RELOCATION_INDEX, ELF.RELOCATION_INDEX + 1
     done:
@@ -603,7 +611,10 @@ calminstruction qword? value
 	local	Rela
 	compute Rela, ELF.RELOCATION_INDEX * sizeof Elf64_Rela
 	asm	store offset at ELF.relocations : Rela + Elf64_Rela.r_offset
+	check ELF.MACHINE = EM_BPF
+	jyes skip_addend
 	asm	store addend at ELF.relocations : Rela + Elf64_Rela.r_addend
+    skip_addend:
 	asm	store info at ELF.relocations : Rela + Elf64_Rela.r_info
 	compute ELF.RELOCATION_INDEX, ELF.RELOCATION_INDEX + 1
     done:
@@ -670,7 +681,7 @@ postpone
 		NUMBER_OF_RELOCATIONS := RELOCATION_INDEX
 		rb (-$%) and 111b
 		RELOCATIONS_OFFSET = $%
-		load byte_sequence : NUMBER_OF_RELOCATIONS * sizeof Elf64_Rela from relocations:0
+		load byte_sequence : NUMBER_OF_RELOCATIONS * RELOC_SIZE from relocations:0
 		db byte_sequence
 
 		store _symtab at section_table : Elf64_Shdr.sh_name + SECTION_INDEX * sizeof Elf64_Shdr

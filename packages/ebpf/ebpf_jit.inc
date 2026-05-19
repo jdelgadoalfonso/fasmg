@@ -2374,8 +2374,21 @@ macro ld_imm64 dst, imm64
     BPF_LD_IMM64 (dst - bpf_reg), imm64
 end macro
 
-macro ld_map_fd dst, map_fd
-    BPF_LD_MAP_FD (dst - bpf_reg), map_fd
+;macro ld_map_fd dst, map_fd
+;    BPF_LD_MAP_FD (dst - bpf_reg), map_fd
+;end macro
+
+macro ld_map_fd? dst_reg, map_source
+    local proxy
+    element proxy : ELF.relocatable * ELF.IDX_#map_source
+
+    db 18h
+    db ((dst_reg - bpf_reg) and 0x0F) or 0x10
+    dw 0
+
+    dd proxy
+
+    db 0, 0, 0, 0, 0, 0, 0, 0
 end macro
 
 macro ldx_mem sz, dst, src, off
@@ -2530,30 +2543,28 @@ macro ret
     BPF_EXIT_INSN
 end macro
 
-; =============================================================================
-; INYECTOR NATIVO DE REUBICACIONES eBPF PARA FASMG
-; =============================================================================
-calminstruction bpf_map_reloc? value
-    compute value, value
-    local offset, addend, info, Rela
+macro bpf_map name, type, key_size, value_size, max_entries
+    align 4
 
-    ; 1. ¿En qué byte de la sección estamos?
-    compute offset, $% - ELF.SECTION_OFFSET
+    ; Asociamos aritméticamente esta etiqueta con nuestro 'element'
+    ; Guardamos su posición relativa como metadato
+    ; Etiqueta global que verá libbpf
+    public name
+    label name : name.length
 
-    ; 2. El addend (por si el mapa no es el primero de la sección)
-    compute addend, 0 scaleof value
-
-    ; 3. Construir r_info: (Indice_Seccion << 32) | R_BPF_64_64 (1)
-    compute info, 1 + (0 scaleof (1 metadataof value)) shl 32
-
-    ; 4. Calcular el offset en la tabla virtual de reubicaciones (24 bytes por Rela)
-    compute Rela, ELF.RELOCATION_INDEX * 24
-
-    ; 5. Inyectar los datos en el motor ELF de fasmg
-    asm store offset at ELF.relocations : Rela + Elf64_Rela.r_offset
-    asm store info   at ELF.relocations : Rela + Elf64_Rela.r_info
-    asm store addend at ELF.relocations : Rela + Elf64_Rela.r_addend
-
-    ; 6. Actualizar el contador global
-    compute ELF.RELOCATION_INDEX, ELF.RELOCATION_INDEX + 1
-end calminstruction
+    dd type
+    dd key_size
+    dd value_size
+    dd max_entries
+    dd 0 ; flags
+    dd 0
+    dd 0
+    dd 0
+    dd 0
+    dd 0
+    .length = $ - .
+    ; Guardamos el índice del símbolo en una variable global del namespace ELF
+    namespace ELF
+        IDX_#name = SYMBOL_INDEX - 1
+    end namespace
+end macro
