@@ -106,19 +106,6 @@ sockfilter_prog:
 
 sockfilter_prog_end:
 
-macro ld_hdr_swap sz, dst, src, off
-    ldx_mem sz, dst, src, off
-    if sz = b
-        ; nada que hacer
-    else if sz = h
-        bswap16 dst
-    else if sz = w
-        bswap32 dst
-    else if sz = dw
-        bswap64 dst
-    end if
-end macro
-
 ; Definición de estructura de mapa según el kernel
 struct bpf_map_def
     type         dd ?

@@ -2513,6 +2513,47 @@ macro clear_reg dst, size
     end match
 end macro
 
+macro ld_hdr_swap sz, dst, src, off
+    ldx_mem sz, dst, src, off
+    if sz = b
+        ; nada que hacer
+    else if sz = h
+        bswap16 dst
+    else if sz = w
+        bswap32 dst
+    else if sz = dw
+        bswap64 dst
+    end if
+end macro
+
 macro ret
     BPF_EXIT_INSN
 end macro
+
+; =============================================================================
+; INYECTOR NATIVO DE REUBICACIONES eBPF PARA FASMG
+; =============================================================================
+calminstruction bpf_map_reloc? value
+    compute value, value
+    local offset, addend, info, Rela
+
+    ; 1. ¿En qué byte de la sección estamos?
+    compute offset, $% - ELF.SECTION_OFFSET
+
+    ; 2. El addend (por si el mapa no es el primero de la sección)
+    compute addend, 0 scaleof value
+
+    ; 3. Construir r_info: (Indice_Seccion << 32) | R_BPF_64_64 (1)
+    compute info, 1 + (0 scaleof (1 metadataof value)) shl 32
+
+    ; 4. Calcular el offset en la tabla virtual de reubicaciones (24 bytes por Rela)
+    compute Rela, ELF.RELOCATION_INDEX * 24
+
+    ; 5. Inyectar los datos en el motor ELF de fasmg
+    asm store offset at ELF.relocations : Rela + 0   ; r_offset
+    asm store info   at ELF.relocations : Rela + 8   ; r_info
+    asm store addend at ELF.relocations : Rela + 16  ; r_addend
+
+    ; 6. Actualizar el contador global
+    compute ELF.RELOCATION_INDEX, ELF.RELOCATION_INDEX + 1
+end calminstruction
