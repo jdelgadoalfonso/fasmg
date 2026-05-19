@@ -524,7 +524,13 @@ calminstruction dword? value
 	jno	done
 	compute offset, offset - ELF.SECTION_OFFSET
 	compute addend, 0 scaleof value
+	check ELF.MACHINE = EM_BPF
+	jyes bpf_r32
 	compute info, ELF.R_32 + (0 scaleof (1 metadataof value)) shl 32
+	jump	add_relocation
+    bpf_r32:
+	; Extraemos el índice del símbolo (scale 1) en lugar del de la sección
+	compute info, ELF.R_32 + (1 scaleof (1 metadataof value)) shl 32
 	jump	add_relocation
     r_pc32:
 	compute offset, $%
@@ -587,7 +593,12 @@ calminstruction qword? value
 	jno	done
 	compute offset, offset - ELF.SECTION_OFFSET
 	compute addend, 0 scaleof value
+	check ELF.MACHINE = EM_BPF
+	jyes bpf_r64
 	compute info, ELF.R_64 + (0 scaleof (1 metadataof value)) shl 32
+	jump	add_relocation
+    bpf_r64:
+	compute info, ELF.R_64 + (1 scaleof (1 metadataof value)) shl 32
     add_relocation:
 	local	Rela
 	compute Rela, ELF.RELOCATION_INDEX * sizeof Elf64_Rela
