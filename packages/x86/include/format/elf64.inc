@@ -99,6 +99,7 @@ EM_NONE   = 0
 EM_IA_64  = 50
 EM_X86_64 = 62
 EM_AARCH64 = 183
+EM_BPF    = 247
 
 EV_NONE    = 0
 EV_CURRENT = 1
@@ -174,6 +175,7 @@ R_X86_64_TPOFF32   = 23
 R_X86_64_PC64	   = 24
 R_X86_64_GOTOFF64  = 25
 R_X86_64_GOTPC32   = 26
+R_BPF_64_64        = 1
 
 ELF::
 
@@ -198,6 +200,14 @@ namespace ELF
 		R_PLT32 = R_X86_64_PLT32
 		R_GOT32 = R_X86_64_GOT32
 		R_GOTPCREL = R_X86_64_GOTPCREL
+	else if MACHINE = EM_BPF
+		; eBPF usa R_BPF_64_64 (1) incluso para el campo imm de 32 bits
+		R_64 = R_BPF_64_64
+		R_32 = R_BPF_64_64
+		R_PC32 = 0
+		R_PLT32 = 0
+		R_GOT32 = 0
+		R_GOTPCREL = 0
 	end if
 
 	Header:
@@ -304,7 +314,11 @@ macro section?
 				store SECTION_NAME_POSITION at section_table : Elf64_Shdr.sh_name + (SECTION_INDEX+1) * sizeof Elf64_Shdr
 				store SECTION_NAME_POSITION + 5 at section_table : Elf64_Shdr.sh_name + SECTION_INDEX * sizeof Elf64_Shdr
 				store SECTION_NAME_POSITION + 5 at symbol_table : Elf64_Sym.st_name + SECTION_SYMBOL_INDEX * sizeof Elf64_Sym
-				store '.rela' + SECTION_NAME shl (5*8) : 5 + lengthof (string SECTION_NAME) at string_table:SECTION_NAME_POSITION
+				if MACHINE = EM_BPF
+					store '.rel.' + SECTION_NAME shl (5*8) : 5 + lengthof (string SECTION_NAME) at string_table:SECTION_NAME_POSITION
+				else
+					store '.rela' + SECTION_NAME shl (5*8) : 5 + lengthof (string SECTION_NAME) at string_table:SECTION_NAME_POSITION
+				end if
 				SECTION_NAME_POSITION = SECTION_NAME_POSITION + 5 + lengthof (string SECTION_NAME) + 1
 
 				SECTION_INDEX = SECTION_INDEX + 2

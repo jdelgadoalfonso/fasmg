@@ -2550,9 +2550,9 @@ calminstruction bpf_map_reloc? value
     compute Rela, ELF.RELOCATION_INDEX * 24
 
     ; 5. Inyectar los datos en el motor ELF de fasmg
-    asm store offset at ELF.relocations : Rela + 0   ; r_offset
-    asm store info   at ELF.relocations : Rela + 8   ; r_info
-    asm store addend at ELF.relocations : Rela + 16  ; r_addend
+    asm store offset at ELF.relocations : Rela + Elf64_Rela.r_offset
+    asm store info   at ELF.relocations : Rela + Elf64_Rela.r_info
+    asm store addend at ELF.relocations : Rela + Elf64_Rela.r_addend
 
     ; 6. Actualizar el contador global
     compute ELF.RELOCATION_INDEX, ELF.RELOCATION_INDEX + 1
