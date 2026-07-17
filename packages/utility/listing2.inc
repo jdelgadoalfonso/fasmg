@@ -22,55 +22,69 @@ namespace Listing
 		HexDigits:: db '0123456789ABCDEF'
 	end virtual
 
-	virtual as 'lst'
-		Text::
+	virtual at 0
+		Space:: db 24 dup ' '
 	end virtual
 
-	define base
-	define address
+	Buffer = ''
+
+	define AREA AREA
+	define ADDRESS ADDRESS
+
+	match AREA:ADDRESS, AREA:ADDRESS
+
+		macro Setup
+			local label
+			label:: define AREA label
+			ADDRESS = $$
+		end macro
+
+	end match
 
 	calminstruction ? &line&
 		assemble line
 		check	ON
 		jno	done
 
-		stringify line
-
-		check	$$ eq base
+		check	defined AREA & $$ eq AREA metadata 1 & $ - $$ = sizeof AREA
 		jyes	area_ok
-		compute base, $$
-		compute address, $
+		asm	Setup
+		check	defined AREA
+		jno	done
 	    area_ok:
 
-		local	bytes, counter, digit
+		taketext line, line
+		jno	done
+		stringify line
 
-		compute bytes, $ - address
+		local	bytes, counter, text
+
+		compute bytes, $ - ADDRESS
 		check	$ - bytes >= $$ & bytes >= 0
 		jyes	size_ok
 		compute bytes, $ - $$
 	    size_ok:
 
-		asm	virtual Text
 		compute counter, 16
 	    print_address:
 		compute counter, counter - 1
-		compute digit, (address shr (counter shl 2)) and 0Fh
-		asm	load digit:1 from HexDigits:digit
-		asm	db digit
+		load	text, HexDigits:( ADDRESS scale 0 shr (counter shl 2)) and 0Fh, 1
+		take	Buffer, text
 		check	counter
 		jyes	print_address
-		asm	db ': '
-		asm	end virtual
+		compute text, ': '
+		take	Buffer, text
 
-		compute address, $
+		compute ADDRESS, $
 
 		local	bytes_in_row, readable_bytes, data
 
 		check	bytes > 0
 		jyes	main
-		asm	virtual Text
-		asm	db 8 dup '   ',line,13,10
-		jump	finish
+		load	text, Space:0, 8*3
+		compute text, text bappend line bappend 13 bappend 10
+		take	Buffer, text
+		jump	done
 
 	    main:
 		compute bytes_in_row, bytes
@@ -90,37 +104,43 @@ namespace Listing
 	    none_readable:
 		compute readable_bytes, 0
 	    read_bytes:
-		asm	load data:readable_bytes from $ - bytes
-		asm	virtual Text
+		load	data, AREA:$ - $$ - bytes, readable_bytes
 		compute counter, 0
 	    print_bytes:
 		check	counter < readable_bytes
 		jno	print_uninitialized_bytes
-		compute digit, (data shr (counter shl 3 + 4)) and 0Fh
-		asm	load digit:byte from HexDigits:digit
-		asm	db digit
-		compute digit, (data shr (counter shl 3)) and 0Fh
-		asm	load digit:byte from HexDigits:digit
-		asm	db digit, ' '
+		load	text, HexDigits:(data shr (counter shl 3 + 4)) and 0Fh, 1
+		take	Buffer, text
+		load	text, HexDigits:(data shr (counter shl 3)) and 0Fh, 1
+		compute text, text bappend ' '
+		take	Buffer, text
 		compute counter, counter + 1
 		jump	print_bytes
 	    print_uninitialized_bytes:
-		asm	db bytes_in_row - readable_bytes dup '?? '
+		check	counter < bytes_in_row
+		jno	bytes_printed
+		compute text, '?? '
+		take	Buffer, text
+		compute counter, counter + 1
+		jump	print_uninitialized_bytes
+	    bytes_printed:
 		check	line
 		jno	line_printed
-		asm	db 8-bytes_in_row dup '   ',line
+		load	text, Space:0, (8-bytes_in_row)*3
+		take	Buffer, text
+		take	Buffer, line
 		compute line, ''
 	    line_printed:
-		asm	db 13,10
+		compute text, 13 bappend 10
+		take	Buffer, text
 		check	bytes > bytes_in_row
-		jno	finish
+		jno	done
 		compute bytes, bytes - bytes_in_row
-		asm	db 18 dup ' '
-		asm	end virtual
+		load	text, Space:0, 18
+		take	Buffer, text
 		jump	main
-	    finish:
-		asm	end virtual
 	    done:
+
 	end calminstruction
 
 end namespace
@@ -130,12 +150,26 @@ calminstruction nolist?!
 end calminstruction
 
 calminstruction list?!
+	asm	Listing.Setup
 	compute Listing.ON, 1
-	compute Listing.base, $$
-	compute Listing.address, $
 end calminstruction
 
 postpone
-	nolist 
+	nolist
+	virtual as 'lst'
+		calminstruction Listing
+			local	stack, line
+		    reverse:
+			take	stack, Listing.Buffer
+			jyes	reverse
+		    write:
+			take	line, stack
+			jno	done
+			emit	lengthof line, line
+			jump	write
+		    done:
+		end calminstruction
+		Listing
+	end virtual
 end postpone
 list
