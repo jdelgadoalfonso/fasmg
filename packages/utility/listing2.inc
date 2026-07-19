@@ -49,7 +49,7 @@ namespace Listing
 		check	defined AREA & $$ eq AREA metadata 1 & $ - $$ = sizeof AREA
 		jyes	area_ok
 		asm	Setup
-		check	defined AREA
+		check	defined AREA & $$ eq AREA metadata 1 & $ - $$ = sizeof AREA
 		jno	done
 	    area_ok:
 

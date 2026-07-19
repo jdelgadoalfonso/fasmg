@@ -190,15 +190,19 @@ This can be used to again rewrite the above sample in a different way:
                 .b = 0
         end namespace
 
-When a name is not preceded by a dot, and as such it does not have explicitly
+It should be emphasized that "namespace" command does not create a new namespace,
+it only enters an existing one associated with a given symbol.
+  When a symbol is specified in an argument to a command (like "namespace")
+with a name that is not preceded by a dot, and as such it does not have explicitly
 specified in what namespace the symbol resides, the assembler looks for defined
 symbol in the current namespace, and if none is found, in the consecutive namespaces
 of parent symbols, starting from the namespace containing the parent symbol of
 current namespace. If no defined symbol with such name is found, it is assumed that
 the name refers to the symbol in the current namespace (and unless there is "?"
 character after such name, it is assumed that the symbol is case-sensitive).
-A definition that does not specify the namespace where the new symbol should be
-created, always makes a new symbol in the current base namespace.
+On the other hand, a definition that does not specify the namespace where
+the new symbol should be created always makes a new symbol in the current
+base namespace.
 
         global = 0
         regional = 1
@@ -211,9 +215,10 @@ created, always makes a new symbol in the current base namespace.
 
 The comments in the above sample show equivalent definitions with respect
 to the original base namespace. Note that when a name is used to specify the
-namespace, the assembler looks for a defined symbol with such name to lookup in
-its namespace, but when it is a name of a symbol to be defined, it is always
-created within the current base namespace.
+namespace, the assembler looks for a defined symbol with such name, but when
+it is a name of a symbol to be defined, it is always created within the current
+base namespace. However, when the argument of a "namespace" command is a name
+of undefined symbol, it similarly refers to a symbol in current namespace.
   When the final dot of an identifier is not followed by any name, it refers
 to the parent symbol of the namespace that would be searched for a symbol if
 there was a name after this dot. Adding such dot at the end of an identifier may
@@ -2074,9 +2079,11 @@ the final argument consumes all the remaining text in line.
   However, because CALM instruction operates outside of the standard preprocessing
 and assembly cycle, its arguments do not become preprocessed parameters. Instead
 they are local symbolic variables, given new values every time the instruction is called.
-  If the name of defined instruction is preceded by another name enclosed in round
-brackets, the statement defines a labeled instruction and enclosed name is the
-argument that is going to receive the text of the label.
+  A "calminstruction" statement can also define a labeled instruction, there is
+no separate command for this purpose like "struc" in case of regular macroinstructions.
+If the name of defined instruction is preceded by another name enclosed in round brackets,
+the statement defines a labeled instruction and enclosed name is the argument that
+is going to receive the text of the label.
   In the definition of CALM instruction, only the statements of its specialized
 language are identified. The initial symbol of every line must be a simple name without
 modifiers and it is only recognized as valid instruction if a case-insensitive symbol with
